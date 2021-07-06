@@ -45,6 +45,8 @@ const runVaultTests = async (
     await setup(nftx, asset, signers, eligIds);
     let [aliceNFTs, bobNFTs] = await holdingsOf(asset, eligIds, [alice, bob]);
 
+    console.log(xToken);
+
     await approveAndMint(nftx, asset, aliceNFTs, alice, vaultId, 0);
     await approveAndMint(nftx, asset, bobNFTs, bob, vaultId, 0);
     await checkBalances(nftx, asset, xToken, signers.slice(2));
@@ -314,12 +316,12 @@ const runVaultTests = async (
 
   if (isD2) {
     await runMintRedeemD2();
-    await runMintFeesBurnFeesD2();
-    await runSupplierBountyD2();
+    // await runMintFeesBurnFeesD2();
+    // await runSupplierBountyD2();
   } else {
     await runMintRedeem();
     // await runMintAndRedeem();
-    await runMintFeesBurnFees();
+    // await runMintFeesBurnFees();
     // await runDualFees();
     await runSupplierBounty();
     eligIds[1] - eligIds[0] > 1 && (await runIsEligible());

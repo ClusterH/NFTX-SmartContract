@@ -1,4 +1,5 @@
 const { BigNumber } = require("ethers");
+const { ethers } = require("@nomiclabs/buidler");
 
 const BASE = BigNumber.from(10).pow(18);
 const UNIT = BASE.div(100);
@@ -13,6 +14,7 @@ const getIntArray = (firstElem, firstNonElem) => {
 };
 
 const initializeAssetTokenVault = async (
+  xstore,
   nftx,
   signers,
   assetNameOrExistingContract,
@@ -21,14 +23,6 @@ const initializeAssetTokenVault = async (
   isD2
 ) => {
   const [owner, misc, alice, bob, carol, dave, eve] = signers;
-
-  const XToken = await ethers.getContractFactory("XToken");
-  const xToken = await XToken.deploy(
-    xTokenName,
-    xTokenName.toUpperCase(),
-    nftx.address
-  );
-  await xToken.deployed();
 
   let asset;
   if (typeof assetNameOrExistingContract == "string") {
@@ -44,15 +38,24 @@ const initializeAssetTokenVault = async (
   } else {
     asset = assetNameOrExistingContract;
   }
+
   const response = await nftx
     .connect(owner)
-    .createVault(xToken.address, asset.address, isD2);
+    .createVault(xTokenName, xTokenName.toUpperCase(), asset.address, isD2);
   const receipt = await response.wait(0);
 
   const vaultId = receipt.events
     .find((elem) => elem.event === "NewVault")
     .args[0].toString();
+  
   await nftx.connect(owner).finalizeVault(vaultId);
+
+  // Somehow, this is returning undefined everywhere else...?
+
+  let xTokenAddress = await xstore.xTokenAddress(vaultId);
+  let ClonedXToken = await ethers.getContractAt("XTokenClonable", xTokenAddress);
+  await ClonedXToken.deployed();
+
   if (isD2) {
     if (typeof assetNameOrExistingContract == "string") {
       await asset.mint(misc._address, BASE.mul(1000));
@@ -60,7 +63,8 @@ const initializeAssetTokenVault = async (
   } else {
     await checkMintNFTs(asset, idsToMint, misc);
   }
-  return { asset, xToken, vaultId };
+
+  return { asset: asset, xToken: ClonedXToken, vaultId:vaultId };
 };
 
 const checkMintNFTs = async (nft, nftIds, to) => {
@@ -171,6 +175,9 @@ const balancesOf = async (token, accounts) => {
 };
 
 const checkBalances = async (nftx, nft, xToken, users) => {
+
+  console.log(xToken);
+
   let tokenAmount = BigNumber.from(0);
   for (let i = 0; i < users.length; i++) {
     const user = users[i];

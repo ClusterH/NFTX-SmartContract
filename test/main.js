@@ -39,6 +39,17 @@ describe("NFTX", function () {
     await nftx.deployed();
     await xStore.transferOwnership(nftx.address);
 
+    const XToken = await ethers.getContractFactory("XTokenClonable");
+    const xToken = await XToken.deploy();
+    await xToken.deployed();
+
+    const XTokenFactory = await ethers.getContractFactory("XTokenFactory");
+    const xTokenFactory = await XTokenFactory.deploy(xToken.address);
+    await xTokenFactory.deployed();
+    await xTokenFactory.transferOwnership(nftx.address);
+
+    await nftx.setXTokenFactoryAddress(xTokenFactory.address);
+
     const signers = await ethers.getSigners();
     const [owner, misc, alice, bob, carol, dave, eve, proxyAdmin] = signers;
 
@@ -49,7 +60,7 @@ describe("NFTX", function () {
     ///////////////
 
     const runNftBasic = async () => {
-      const { asset, xToken, vaultId } = await initializeAssetTokenVault(
+      const { asset, xToken, vaultId } = await initializeAssetTokenVault(xStore,
         nftx,
         signers,
         "NFT",
@@ -57,6 +68,9 @@ describe("NFTX", function () {
         allNftIds,
         false
       );
+
+      console.log(vaultId);
+
       const eligIds = getIntArray(0, 20);
       await runVaultTests(
         nftx,
@@ -76,7 +90,7 @@ describe("NFTX", function () {
 
     let _asset;
     const runNftSpecial = async () => {
-      const { asset, xToken, vaultId } = await initializeAssetTokenVault(
+      const { asset, xToken, vaultId } = await initializeAssetTokenVault(xStore,
         nftx,
         signers,
         "NFT",
@@ -109,7 +123,7 @@ describe("NFTX", function () {
         console.log("No _asset object...");
         return;
       }
-      const { asset, xToken, vaultId } = await initializeAssetTokenVault(
+      const { asset, xToken, vaultId } = await initializeAssetTokenVault(xStore,
         nftx,
         signers,
         _asset,
@@ -139,7 +153,7 @@ describe("NFTX", function () {
     //////////////
 
     const runD2Vault = async () => {
-      const { asset, xToken, vaultId } = await initializeAssetTokenVault(
+      const { asset, xToken, vaultId } = await initializeAssetTokenVault(xStore,
         nftx,
         signers,
         "Punk-BPT",
@@ -157,7 +171,7 @@ describe("NFTX", function () {
     const runContractUpgrade = async () => {
       console.log("Testing: Contract upgrade...\n");
 
-      const { asset, xToken, vaultId } = await initializeAssetTokenVault(
+      const { asset, xToken, vaultId } = await initializeAssetTokenVault(xStore,
         nftx,
         signers,
         "NFT",
@@ -175,11 +189,13 @@ describe("NFTX", function () {
       // nftx = await upgrades.upgradeProxy(nftx.address, NFTXv2);
       const nftxV2Address = await upgrades.prepareUpgrade(nftx.address, NFTXv2);
 
-      const ProxyController = await ethers.getContractFactory("ProxyController");
+      const ProxyController = await ethers.getContractFactory(
+        "ProxyController"
+      );
       const pc = await ProxyController.deploy(nftx.address);
       await pc.deployed();
       await upgrades.admin.changeProxyAdmin(nftx.address, pc.address);
-      
+
       await pc.connect(owner).upgradeProxyTo(nftxV2Address);
       nftx = NFTXv2.attach(nftx.address);
 
